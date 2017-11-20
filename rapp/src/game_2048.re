@@ -36,32 +36,42 @@ module ScoreBoard = {
 let newGame(size) = { board_size: size, score: 0, last_delta_score: 0, step:0, turn:false, board: Array.make_matrix(size, size, None), ended: false };
 
 let moveBoard = (board, size, direction) => {
+  let filter_adj_((sc0, h), (sc, tail)) = (sc + sc0, [h, ...tail]);
   let rec filter_adj(ln) = switch(ln) {
-    | [Some(a), Some(b), ...tail] when a==b => [Some(a+b), ...filter_adj(tail)]
-    | [a, ...tail] => [a, ...filter_adj(tail)]
-    | [] => []
+    | [Some(a), Some(b), ...tail] when a==b => filter_adj_((a, Some(a+b)), filter_adj(tail)) /*[Some(a+b), ...filter_adj(tail)]*/
+    | [a, ...tail] => filter_adj_((0, a), filter_adj(tail)) /*[a, ...filter_adj(tail)]*/
+    | [] => (0, [])
   };
   let to_array(n, ln) = {
     let arr = Array.make(n, None);
     List.iteri((i,x) => arr[i]=x, ln);
     arr
   };
-  let board = switch direction {
-    | Left => {
-        board |> Array.map ((ln) => {
-          ln |> Array.to_list |> List.filter ((!=)(None))
-             |> filter_adj |> to_array(size)
-        })
-      }
-    | Right => {
-        board |> Array.map ((ln) => {
-          ln |> Array.to_list |> List.rev |> List.filter ((!=)(None))
-             |> filter_adj |> to_array(size) |> Array.to_list |> List.rev |> Array.of_list
-        })
-      }
-    | _ => board
+  let process = (board, size, readarr, savearr) => {
+    let newBoard = Array.make_matrix(size, size, None);
+    let score = ref(0);
+    for (x in 0 to size-1) {
+      let (sc, ln) = readarr(board, x) |> Array.to_list |> List.filter ((!=)(None)) |> filter_adj;
+      ln |> to_array(size) |> savearr(newBoard, x);
+      score := score^ + sc;
+    };
+    (score^, newBoard)
   };
-  (board, -1)
+  let (score, board) = switch direction {
+    | Left => process(board, size,
+                      (b, x) => b[x],
+                      (b, x, t) => b[x] = t)
+    | Right => process(board, size,
+                       (b, x) => BatArray.rev(b[x]),
+                       (b, x, t) => b[x] = BatArray.rev(t))
+    | Up => process(board, size,
+                    (b, x) => Array.map((ln) => ln[x], b),
+                    (b, x, t) => BatArray.iter2((ln, tt) => ln[x] = tt, b, t))
+    | Down => process(board, size,
+                      (b, x) => Array.map((ln) => ln[x], b) |> BatArray.rev,
+                      (b, x, t) => BatArray.iter2((ln, tt) => ln[x] = tt, b, BatArray.rev(t)))
+  };
+  (board, score)
 };
 
 let make = (_children) => {
