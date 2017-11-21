@@ -1,0 +1,7 @@
+build/
+lib/
+node_modules/
+.merlin
+*.lock
+*.bs.js
+*-lock.json
