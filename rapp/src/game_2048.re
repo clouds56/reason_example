@@ -58,11 +58,19 @@ module GameBoard = {
     let make = (~x, ~y, ~p, _children) => {
       ...component,
       render: (_self) => {
-        let (class_, text) = switch p {
-          | Some(t) => ({j|gameboard_cell gameboard_cell_$t|j}, {j|$t|j})
-          | None => ({j|gameboard_cell gameboard_cell_empty|j}, {j|x|j})
+        let (class_, text, background) = switch p {
+          | Some(t) => {
+            ({j|gameboard_cell gameboard_cell_$t|j}, {j|$t|j}, switch t {
+              | t when t <= 7 => { let i = Pervasives.float(t)/.8.0; {j|rgba(255,255,0, $i)|j}}
+              | t when t <= 15 => { let i = Pervasives.float(t)/.16.0; {j|rgba(0,0,255, $i)|j}}
+              | _ => "#202020"
+            })
+          }
+          | None => ({j|gameboard_cell gameboard_cell_empty|j}, "", "#C0C0C0")
         };
-        <td className=(class_) id=({j|board_cell_$(x)_$(y)|j})>
+        let style = ReactDOMRe.Style.make(~width="100px", ~height="100px", ~background={j|$background|j},
+                        ~textAlign="center", ~fontSize="30px", ~fontFamily="sans-serif", ());
+        <td style=(style) className=(class_) id=({j|board_cell_$(x)_$(y)|j})>
           (ReasonReact.stringToElement(text))
         </td>
       }
@@ -89,7 +97,7 @@ let newGame(size) = { board_size: size, score: 0, last_delta_score: 0, step:0, t
 let moveBoard = (board, size, direction) => {
   let filter_adj_((sc0, h), (sc, tail)) = (sc + sc0, [h, ...tail]);
   let rec filter_adj(ln) = switch(ln) {
-    | [Some(a), Some(b), ...tail] when a==b => filter_adj_((a, Some(a+b)), filter_adj(tail)) /*[Some(a+b), ...filter_adj(tail)]*/
+    | [Some(a), Some(b), ...tail] when a==b => filter_adj_((a, Some(a+1)), filter_adj(tail)) /*[Some(a+b), ...filter_adj(tail)]*/
     | [a, ...tail] => filter_adj_((0, a), filter_adj(tail)) /*[a, ...filter_adj(tail)]*/
     | [] => (0, [])
   };
@@ -178,7 +186,7 @@ let make = (_children) => {
           Js.log(Array.length(i));
           let j = Random.int(Array.length(i));
           let (x, y) = i[j];
-          ReasonReact.SideEffects((self) => self.reduce((_)=>Add(x, y, Some(2)), ()))
+          ReasonReact.SideEffects((self) => self.reduce((_)=>Add(x, y, Some(1)), ()))
         }
       | GameOver => ReasonReact.Update({...state, ended: true})
     }
@@ -186,7 +194,9 @@ let make = (_children) => {
   render: ({state: {step, score, last_delta_score, board_size, board}} as self) => {
     let message = {j|step: $step!|j};
     <div>
-      <div onClick=(self.reduce((_) => Add(1,1,Some(2))))> (ReasonReact.stringToElement(message)) </div>
+      <div onClick=(self.reduce((_) => Add(1,1,Some(1))))>
+        (ReasonReact.stringToElement(message))
+      </div>
       <ScoreBoard score last_delta_score />
       <GameBoard board_size board />
       <button onClick=(self.reduce((_) => Move(Left)))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
