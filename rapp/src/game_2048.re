@@ -8,6 +8,7 @@ type action =
   | NewGame
   | Move(direction)
   | Add(int, int, option(int))
+  | AddRandom
   | GameOver;
 
 type state = {
@@ -22,6 +23,24 @@ type state = {
 
 let component = ReasonReact.reducerComponent("Game_2048");
 
+module Matrix = {
+  /* let map_ = (raw_map, f, m) => {
+    raw_map((m) => raw_map(f, m), m)
+  };
+  let map = (f, m) => map_(Array.map, f, m); */
+  let map = (f, m) => {
+    let raw_map = Array.map;
+    raw_map((m) => raw_map(f, m), m)
+  };
+  let where = (f, m) => {
+    let raw_fold = BatArray.fold_lefti;
+    raw_fold((r, x, l) => raw_fold((r, y, i) => switch (f(i)) {
+      | true => [(x,y), ...r]
+      | false => r
+    }, r, l), [], m)
+  };
+};
+
 module ScoreBoard = {
   let component = ReasonReact.statelessComponent("Game_2048_ScoreBoard");
   let make = (~score, ~last_delta_score, _children) => {
@@ -29,6 +48,38 @@ module ScoreBoard = {
     render: (_self) => {
       let delta = if (last_delta_score<0) { {j|$last_delta_score|j} } else { {j|+$last_delta_score|j} };
       <div> (ReasonReact.stringToElement({j|score: $score ($delta)|j})) </div>
+    }
+  };
+};
+
+module GameBoard = {
+  module Cell = {
+    let component = ReasonReact.statelessComponent("Game_2048_GameBoard_Cell");
+    let make = (~x, ~y, ~p, _children) => {
+      ...component,
+      render: (_self) => {
+        let (class_, text) = switch p {
+          | Some(t) => ({j|gameboard_cell gameboard_cell_$t|j}, {j|$t|j})
+          | None => ({j|gameboard_cell gameboard_cell_empty|j}, {j|x|j})
+        };
+        <td className=(class_) id=({j|board_cell_$(x)_$(y)|j})>
+          (ReasonReact.stringToElement(text))
+        </td>
+      }
+    }
+  };
+
+  let component = ReasonReact.statelessComponent("Game_2048_GameBoard");
+  let make = (~board_size, ~board, _children) => {
+    ...component,
+    render: (_self) => {
+      let board_elements = board |> Array.mapi((x, ln) =>
+        <tr key=({j|board_ln_$x|j})>
+          (ln
+            |> Array.mapi((y, i) => <Cell x y p=(i) key=({j|board_cell_$(x)_$(y)|j}) />)
+            |> ReasonReact.arrayToElement)
+        </tr>);
+      <table> <tbody> (board_elements |> ReasonReact.arrayToElement) </tbody> </table>
     }
   };
 };
@@ -100,12 +151,14 @@ let make = (_children) => {
       | NewGame => ReasonReact.Update(newGame(4))
       | Move(direction) => {
           switch (move(state.board, state.board_size, direction)) {
-            | Some((board, score)) => ReasonReact.Update({...state,
+            | Some((board, score)) => ReasonReact.UpdateWithSideEffects({...state,
                 step: state.step+1,
                 board: board,
                 score: state.score+score,
                 last_delta_score: score,
-                turn: false})
+                turn: false},
+                (self) => {
+                    Js.log("Side effect => AddRandom");self.reduce((_)=>AddRandom, ())})
             | None => ReasonReact.SideEffects((_) => { /*let d = Printf.sprintf("%a", direction);*/ Js.log({j|info: can not move $direction|j}) })
           }
         }
@@ -120,24 +173,22 @@ let make = (_children) => {
             | None => NoUpdate
           }
         }
+      | AddRandom => {
+          let i = Array.of_list(Matrix.where((==)(None), state.board));
+          Js.log(Array.length(i));
+          let j = Random.int(Array.length(i));
+          let (x, y) = i[j];
+          ReasonReact.SideEffects((self) => self.reduce((_)=>Add(x, y, Some(2)), ()))
+        }
       | GameOver => ReasonReact.Update({...state, ended: true})
     }
   },
-  render: ({state: {step, score, last_delta_score, board}} as self) => {
+  render: ({state: {step, score, last_delta_score, board_size, board}} as self) => {
     let message = {j|step: $step!|j};
-    let board_elements = board |> Array.mapi((x, ln) =>
-      <div key=({j|board_ln_$x|j})>
-        (ln
-          |> Array.mapi((y, i) => switch i {
-              | Some(t) => <span key=({j|board_cell_$(x)_$(y)|j})> (ReasonReact.stringToElement({j|$t|j})) </span>
-              | None => <span key=({j|board_cell_$(x)_$(y)|j})> (ReasonReact.stringToElement({j|x|j})) </span>
-            })
-          |> ReasonReact.arrayToElement)
-      </div>);
     <div>
       <div onClick=(self.reduce((_) => Add(1,1,Some(2))))> (ReasonReact.stringToElement(message)) </div>
       <ScoreBoard score last_delta_score />
-      (ReasonReact.arrayToElement(board_elements))
+      <GameBoard board_size board />
       <button onClick=(self.reduce((_) => Move(Left)))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
       <button onClick=(self.reduce((_) => Move(Up)))> (ReasonReact.stringToElement({js|⬆️|js})) </button>
       <button onClick=(self.reduce((_) => Move(Down)))> (ReasonReact.stringToElement({js|⬇️|js})) </button>
