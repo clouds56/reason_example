@@ -81,6 +81,7 @@ module GameBoard = {
   let make = (~board_size, ~board, _children) => {
     ...component,
     render: (_self) => {
+      let _board_size = board_size;
       let board_elements = board |> Array.mapi((x, ln) =>
         <tr key=({j|board_ln_$x|j})>
           (ln
@@ -90,6 +91,36 @@ module GameBoard = {
       <table> <tbody> (board_elements |> ReasonReact.arrayToElement) </tbody> </table>
     }
   };
+};
+
+module InputArea = {
+  let component = ReasonReact.statelessComponent("Game_2048_InputArea");
+  let make = (~onMove, _children) => {
+    let handleInput = (event, _self) => {
+      let charCode = ReactDOMRe.domElementToObj(ReactEventRe.Form.target(event))##value;
+      String.iter((c) => switch c {
+        | 'h' => onMove(Left) |> ignore
+        | 'j' => onMove(Up) |> ignore
+        | 'k' => onMove(Down) |> ignore
+        | 'l' => onMove(Right) |> ignore
+        | _ => ()
+      }, charCode);
+      Js.log(charCode);
+      ReactDOMRe.domElementToObj(ReactEventRe.Form.target(event))##value #= "";
+    };
+    {
+      ...component,
+      render: (self) => {
+        <div>
+          <button onClick=((_) => onMove(Left))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
+          <button onClick=((_) => onMove(Up))> (ReasonReact.stringToElement({js|⬆️|js})) </button>
+          <button onClick=((_) => onMove(Down))> (ReasonReact.stringToElement({js|⬇️|js})) </button>
+          <button onClick=((_) => onMove(Right))> (ReasonReact.stringToElement({js|➡️|js})) </button>
+          <textarea onInput=(self.handle(handleInput)) />
+        </div>
+      }
+    }
+  }
 };
 
 let newGame(size) = { board_size: size, score: 0, last_delta_score: 0, step:0, turn:false, board: Array.make_matrix(size, size, None), ended: false };
@@ -156,7 +187,7 @@ let make = (_children) => {
       }
     };
     switch action {
-      | NewGame => ReasonReact.Update(newGame(4))
+      | NewGame => ReasonReact.UpdateWithSideEffects(newGame(4), (self) => self.reduce((_)=>AddRandom, ()))
       | Move(direction) => {
           switch (move(state.board, state.board_size, direction)) {
             | Some((board, score)) => ReasonReact.UpdateWithSideEffects({...state,
@@ -172,21 +203,41 @@ let make = (_children) => {
         }
       | Add(x, y, t) => {
           switch (add(state.board, x, y, t)) {
-            | Some(board) => ReasonReact.UpdateWithSideEffects(
-                {...state,
-                  step: state.step+1,
-                  board: board,
-                  turn: true},
-                (_) => Js.log({j|Add($x,$y): $t|j}));
+            | Some(board) => {
+                let space = Array.of_list(Matrix.where((==)(None), state.board)) |> Array.length;
+                if (space > 0) {
+                  ReasonReact.UpdateWithSideEffects(
+                    {...state,
+                      step: state.step+1,
+                      board: board,
+                      turn: true},
+                    (_) => Js.log({j|Add($x,$y): $t|j}));
+                } else {
+                  ReasonReact.UpdateWithSideEffects(
+                    {...state,
+                      step: state.step+1,
+                      board: board,
+                      turn: true},
+                    (self) => {
+                      Js.log({j|Add($x,$y): $t|j});
+                      self.reduce((_)=>GameOver, ());
+                    });
+                }
+              }
             | None => NoUpdate
           }
         }
       | AddRandom => {
           let i = Array.of_list(Matrix.where((==)(None), state.board));
-          Js.log(Array.length(i));
-          let j = Random.int(Array.length(i));
-          let (x, y) = i[j];
-          ReasonReact.SideEffects((self) => self.reduce((_)=>Add(x, y, Some(1)), ()))
+          /* Js.log(Array.length(i)); */
+          switch (Array.length(i)) {
+            | t when t > 0 => {
+                let j = Random.int(t);
+                let (x, y) = i[j];
+                ReasonReact.SideEffects((self) => self.reduce((_)=>Add(x, y, Some(1)), ()))
+              }
+            | _ => ReasonReact.SideEffects((self) => self.reduce((_)=>GameOver, ()))
+          }
         }
       | GameOver => ReasonReact.Update({...state, ended: true})
     }
@@ -194,15 +245,12 @@ let make = (_children) => {
   render: ({state: {step, score, last_delta_score, board_size, board}} as self) => {
     let message = {j|step: $step!|j};
     <div>
-      <div onClick=(self.reduce((_) => Add(1,1,Some(1))))>
+      <div onClick=(self.reduce((_) => AddRandom))>
         (ReasonReact.stringToElement(message))
       </div>
       <ScoreBoard score last_delta_score />
       <GameBoard board_size board />
-      <button onClick=(self.reduce((_) => Move(Left)))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
-      <button onClick=(self.reduce((_) => Move(Up)))> (ReasonReact.stringToElement({js|⬆️|js})) </button>
-      <button onClick=(self.reduce((_) => Move(Down)))> (ReasonReact.stringToElement({js|⬇️|js})) </button>
-      <button onClick=(self.reduce((_) => Move(Right)))> (ReasonReact.stringToElement({js|➡️|js})) </button>
+      <InputArea onMove=((direction) => self.reduce((_) => Move(direction), ())) />
     </div>
   }
 };

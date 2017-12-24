@@ -10,6 +10,7 @@
     "module": "commonjs",
     "in-source": true
   }],
+  "generate-merlin" : true,
   "refmt": 3,
   "sources": ["src"],
   "namespace": true,
