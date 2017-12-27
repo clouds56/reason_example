@@ -95,14 +95,15 @@ module GameBoard = {
 
 module InputArea = {
   let component = ReasonReact.statelessComponent("Game_2048_InputArea");
-  let make = (~onMove, _children) => {
+  let make = (~onAction, _children) => {
     let handleInput = (event, _self) => {
       let charCode = ReactDOMRe.domElementToObj(ReactEventRe.Form.target(event))##value;
       String.iter((c) => switch c {
-        | 'h' => onMove(Left) |> ignore
-        | 'j' => onMove(Up) |> ignore
-        | 'k' => onMove(Down) |> ignore
-        | 'l' => onMove(Right) |> ignore
+        | 'h' => onAction(Move(Left)) |> ignore
+        | 'j' => onAction(Move(Down)) |> ignore
+        | 'k' => onAction(Move(Up)) |> ignore
+        | 'l' => onAction(Move(Right)) |> ignore
+        | 'i' => onAction(AddRandom) |> ignore
         | _ => ()
       }, charCode);
       Js.log(charCode);
@@ -112,10 +113,10 @@ module InputArea = {
       ...component,
       render: (self) => {
         <div>
-          <button onClick=((_) => onMove(Left))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
-          <button onClick=((_) => onMove(Up))> (ReasonReact.stringToElement({js|⬆️|js})) </button>
-          <button onClick=((_) => onMove(Down))> (ReasonReact.stringToElement({js|⬇️|js})) </button>
-          <button onClick=((_) => onMove(Right))> (ReasonReact.stringToElement({js|➡️|js})) </button>
+          <button onClick=((_) => onAction(Move(Left)))> (ReasonReact.stringToElement({js|⬅️|js})) </button>
+          <button onClick=((_) => onAction(Move(Down)))> (ReasonReact.stringToElement({js|⬇️|js})) </button>
+          <button onClick=((_) => onAction(Move(Up)))> (ReasonReact.stringToElement({js|⬆️|js})) </button>
+          <button onClick=((_) => onAction(Move(Right)))> (ReasonReact.stringToElement({js|➡️|js})) </button>
           <textarea onInput=(self.handle(handleInput)) />
         </div>
       }
@@ -250,7 +251,7 @@ let make = (_children) => {
       </div>
       <ScoreBoard score last_delta_score />
       <GameBoard board_size board />
-      <InputArea onMove=((direction) => self.reduce((_) => Move(direction), ())) />
+      <InputArea onAction=((action) => self.reduce((_) => action, ())) />
     </div>
   }
 };
