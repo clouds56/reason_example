@@ -19,6 +19,7 @@
     "bs-batteries": "^0.0.14",
     "react": ">=16.0.0",
     "react-dom": ">=16.0.0",
+    "react-virtualized": "^9.14.1",
     "reason-react": ">=0.2.1"
   },
   "devDependencies": {
@@ -30,6 +31,8 @@
     "webpack": "^3.8.1"
   },
   "babel": {
-    "presets" : ["react"]
+    "presets": [
+      "react"
+    ]
   }
 }
